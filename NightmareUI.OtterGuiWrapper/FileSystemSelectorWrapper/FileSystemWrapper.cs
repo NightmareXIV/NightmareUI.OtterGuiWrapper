@@ -21,15 +21,20 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Runtime.CompilerServices;
 using ECommons.DalamudServices;
+using ECommons.ImGuiMethods;
+using System.Collections.Specialized;
+#pragma warning disable CS8618
+#pragma warning disable
 
 namespace NightmareUI.OtterGuiWrapper.FileSystemSelectorWrapper;
-public sealed class FileSystemSelectorWrapper<T> : FileSystem<T>, IDisposable where T:class, IFileSystemSelectorItem
+public sealed class FileSystemSelectorWrapper<T> : FileSystem<T>, IDisposable where T:class, IFileSystemSelectorItem, new()
 {
-    public readonly FileSystemSelector<FileSystem<T>> Selector;
+    public readonly FileSystemSelector Selector;
     public readonly FileSystemDataStorage<T> Storage;
     public FileSystemSelectorWrapper(FileSystemDataStorage<T> storage)
     {
         this.Storage = storage;
+        Storage.Storage.CollectionChanged += this.Storage_CollectionChanged;
         try
         {
             this.Load(BuildJObject(), Storage.Storage, ConvertToIdentifier, ConvertToName);
@@ -41,20 +46,21 @@ public sealed class FileSystemSelectorWrapper<T> : FileSystem<T>, IDisposable wh
         }
     }
 
+    private void Storage_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        PluginLog.Debug($"Collection has changed, begin file system rebuild! Event={e.Action}");
+        this.Save();
+        this.Load(BuildJObject(), Storage.Storage, ConvertToIdentifier, ConvertToName);
+    }
+
     public void Dispose()
     {
         
     }
 
-    public void DoDelete(T status)
+    public void DoDelete(T item)
     {
-        PluginLog.Debug($"Deleting {status.ID}");
-        C.SavedStatuses.Remove(status);
-        if (FindLeaf(status, out var leaf))
-        {
-            this.Delete(leaf);
-        }
-        this.Save();
+        Storage.Storage.Remove(item);
     }
 
     public bool FindLeaf(T? item, [NotNullWhen(true)]out Leaf? leaf)
@@ -84,7 +90,9 @@ public sealed class FileSystemSelectorWrapper<T> : FileSystem<T>, IDisposable wh
             EmptyFolders = Storage.EmptyFolderStorage,
             Data = Storage.Storage.ToDictionary(x => x.FileSystemData.Guid.ToString(), x => x.FileSystemData.Path),
         };
-        var obj = new JObject(data);
+        var text = JsonConvert.SerializeObject(data);
+        PluginLog.Information(text);
+        var obj = JObject.Parse(text);
         return obj;
     }
 
@@ -92,12 +100,13 @@ public sealed class FileSystemSelectorWrapper<T> : FileSystem<T>, IDisposable wh
     {
         foreach (var x in Storage.Storage)
         {
+            if (x.FileSystemData == null) x.FileSystemData = new();
             Guid newGuid;
             do
             {
                 newGuid = Guid.NewGuid();
             }
-            while (Storage.Storage.Any(x => x.FileSystemData.Guid == newGuid));
+            while (Storage.Storage.Any(x => x.FileSystemData?.Guid == newGuid));
             x.FileSystemData.Guid = newGuid;
         }
     }
@@ -108,18 +117,28 @@ public sealed class FileSystemSelectorWrapper<T> : FileSystem<T>, IDisposable wh
         {
             ShuffleGuid();
             using var memoryStream = new MemoryStream();
-            using var writer = new StreamWriter(memoryStream);
+            using var writer = new StreamWriter(memoryStream, null, -1, true);
             this.SaveToFile(writer, SaveConverter, true);
             memoryStream.Position = 0;
             using var reader = new StreamReader(memoryStream);
-            var data = JsonConvert.DeserializeObject<FileSystemDataFormat>(reader.ReadToEnd());
+            var text = reader.ReadToEnd();
+            PluginLog.Information($"{text}");
+            var data = JsonConvert.DeserializeObject<FileSystemDataFormat>(text);
             if (data == null)
             {
                 PluginLog.Error($"Could not save empty folder data.");
             }
             else
             {
-                Storage.EmptyFolderStorage = data.EmptyFolders;
+                Storage.EmptyFolderStorage.Clear();
+                Storage.EmptyFolderStorage.AddRange(data.EmptyFolders);
+                foreach(var x in data.Data)
+                {
+                    if(Guid.TryParse(x.Key, out var guid) && Storage.Storage.TryGetFirst(z => z.FileSystemData.Guid == guid, out var value))
+                    {
+                        value.FileSystemData.Path = x.Value;
+                    }
+                }
             }
         }
         catch (Exception ex)
@@ -134,16 +153,16 @@ public sealed class FileSystemSelectorWrapper<T> : FileSystem<T>, IDisposable wh
         return (item.FileSystemData.Guid.ToString(), true);
     }
 
-    public class FileSystemSelector<F> : FileSystemSelector<T, FileSystemSelector<F>.State> where F : FileSystem<T>
+    public class FileSystemSelector : FileSystemSelector<T, FileSystemSelector.State> 
     {
         string NewName = "";
-        string ClipboardText = null;
-        T Clone = null;
-        F FS;
+        string? ClipboardText = null;
+        T? CloneObject = null;
+        FileSystemSelectorWrapper<T> FS;
 
         public override ISortMode<T> SortMode => ISortMode<T>.FoldersFirst;
 
-        public FileSystemSelector(F fs) : base(fs, Svc.KeyState, new(), (e) => e.Log())
+        public FileSystemSelector(FileSystemSelectorWrapper<T> fs) : base(fs, Svc.KeyState, new(), (e) => e.Log())
         {
             FS = fs;
             AddButton(NewMoodleButton, 0);
@@ -158,7 +177,8 @@ public sealed class FileSystemSelectorWrapper<T> : FileSystem<T>, IDisposable wh
         protected override void DrawLeafName(Leaf leaf, in State state, bool selected)
         {
             var flag = selected ? ImGuiTreeNodeFlags.Selected | LeafFlags : LeafFlags;
-            using var _ = ImRaii.TreeNode(leaf.Name + $"                                                       ", flag);
+            flag |= ImGuiTreeNodeFlags.SpanFullWidth;
+            using var _ = ImRaii.TreeNode((leaf.Value.GetName() ?? leaf.Name) + $"##{leaf.Value.FileSystemData.Guid}", flag);
         }
 
         private void CopyToClipboardButton(Vector2 vector)
@@ -166,23 +186,21 @@ public sealed class FileSystemSelectorWrapper<T> : FileSystem<T>, IDisposable wh
             if (!ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Copy.ToIconString(), vector, "Copy to clipboard.", Selected == null, true)) return;
             if (this.Selected != null)
             {
-                var copy = this.Selected.JSONClone();
-                copy.GUID = Guid.Empty;
-                Copy(EzConfig.DefaultSerializationFactory.Serialize(copy, false));
+                GenericHelpers.Copy(EzConfig.DefaultSerializationFactory.Serialize(this.Selected, false));
             }
         }
 
         private void ImportButton(Vector2 size)
         {
-            if (!ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.FileImport.ToIconString(), size, "Try to import a moodle from your clipboard.", false,
+            if (!ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.FileImport.ToIconString(), size, "Try to import an item from your clipboard.", false,
                     true))
                 return;
 
             try
             {
-                Clone = null;
-                ClipboardText = Paste();
-                ImGui.OpenPopup("##NewMoodle");
+                CloneObject = null;
+                ClipboardText = GenericHelpers.Paste();
+                ImGui.OpenPopup("##NewObject");
             }
             catch
             {
@@ -192,23 +210,23 @@ public sealed class FileSystemSelectorWrapper<T> : FileSystem<T>, IDisposable wh
 
         private void DeleteButton(Vector2 vector)
         {
-            DeleteSelectionButton(vector, new DoubleModifier(ModifierHotkey.Control), "moodle", "moodles", FS.DoDelete);
+            DeleteSelectionButton(vector, new DoubleModifier(ModifierHotkey.Control), "item", "items", FS.DoDelete);
         }
 
         private void NewMoodleButton(Vector2 size)
         {
-            if (ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Plus.ToIconString(), size, "Create new status", false,
+            if (ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Plus.ToIconString(), size, "Create new item", false,
                     true))
             {
                 ClipboardText = null;
-                Clone = null;
-                ImGui.OpenPopup("##NewMoodle");
+                CloneObject = null;
+                ImGui.OpenPopup("##NewItem");
             }
         }
 
         private void DrawNewMoodlePopup()
         {
-            if (!ImGuiUtil.OpenNameField("##NewMoodle", ref NewName))
+            if (!ImGuiUtil.OpenNameField("##NewItem", ref NewName))
                 return;
 
             if (NewName == "")
@@ -221,11 +239,10 @@ public sealed class FileSystemSelectorWrapper<T> : FileSystem<T>, IDisposable wh
             {
                 try
                 {
-                    var newStatus = EzConfig.DefaultSerializationFactory.Deserialize<T>(ClipboardText);
-                    if (newStatus.IsNotNull())
+                    var newObject = EzConfig.DefaultSerializationFactory.Deserialize<T>(ClipboardText);
+                    if (newObject != null)
                     {
-                        FS.CreateLeaf(FS.Root, NewName, newStatus);
-                        C.SavedStatuses.Add(newStatus);
+                        FS.Storage.Storage.Add(newObject);
                     }
                     else
                     {
@@ -238,7 +255,7 @@ public sealed class FileSystemSelectorWrapper<T> : FileSystem<T>, IDisposable wh
                     Notify.Error($"Error: {e.Message}");
                 }
             }
-            else if (Clone != null)
+            else if (CloneObject != null)
             {
 
             }
@@ -246,9 +263,8 @@ public sealed class FileSystemSelectorWrapper<T> : FileSystem<T>, IDisposable wh
             {
                 try
                 {
-                    var newStatus = new T();
-                    FS.CreateLeaf(FS.Root, NewName, newStatus);
-                    C.SavedStatuses.Add(newStatus);
+                    var newItem = new T();
+                    FS.Storage.Storage.Add(newItem);
                 }
                 catch (Exception e)
                 {

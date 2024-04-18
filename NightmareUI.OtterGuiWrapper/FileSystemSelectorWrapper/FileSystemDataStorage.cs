@@ -10,8 +10,8 @@ namespace NightmareUI.OtterGuiWrapper.FileSystemSelectorWrapper;
 [Serializable]
 public class FileSystemDataStorage<T>
 {
-    public ObservableCollection<T> Storage { get; internal set; }
-    public List<string> EmptyFolderStorage { get; internal set; } =  [];
+    public ObservableCollection<T> Storage { get; private set; }
+    public List<string> EmptyFolderStorage { get; private set; } =  [];
 
     public FileSystemDataStorage(ObservableCollection<T> storage)
     {
