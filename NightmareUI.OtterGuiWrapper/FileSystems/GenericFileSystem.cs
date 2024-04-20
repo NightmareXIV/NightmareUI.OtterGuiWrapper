@@ -19,6 +19,11 @@ using ECommons.Logging;
 using System.Diagnostics.CodeAnalysis;
 using NightmareUI.OtterGuiWrapper.FileSystems;
 using System.Numerics;
+using Dalamud.Hooking;
+using FFXIVClientStructs.FFXIV.Client.UI;
+using Dalamud.Interface.Utility;
+
+
 #pragma warning disable CS8618
 #pragma warning disable
 
@@ -83,17 +88,27 @@ public sealed class GenericFileSystem<TData> : FileSystem<TData> where TData:cla
             this.Delete(leaf);
         }
         this.Save();
-    }
+		}
 
-    public bool FindLeaf(TData? item, [NotNullWhen(true)] out Leaf? leaf)
-    {
-        leaf = Root.GetAllDescendants(ISortMode<TData>.Lexicographical)
-            .OfType<Leaf>()
-            .FirstOrDefault(l => l.Value == item);
-        return leaf != null;
-    }
+		public bool FindLeaf(TData? item, [NotNullWhen(true)] out Leaf? leaf)
+		{
+				leaf = Root.GetAllDescendants(ISortMode<TData>.Lexicographical)
+						.OfType<Leaf>()
+						.FirstOrDefault(l => l.Value == item);
+				return leaf != null;
+		}
 
-    public bool TryGetPathByID(Guid id, [NotNullWhen(true)] out string? path)
+		public IEnumerable<Folder> GetAllFolders()
+		{
+				return Root.GetAllDescendants(ISortMode<TData>.Lexicographical).OfType<Folder>();
+		}
+
+		public IEnumerable<Leaf> GetAllLeaves()
+		{
+				return Root.GetAllDescendants(ISortMode<TData>.Lexicographical).OfType<Leaf>();
+		}
+
+		public bool TryGetPathByID(Guid id, [NotNullWhen(true)] out string? path)
     {
         if (FindLeaf(DataStorage.FirstOrDefault(x => x.GUID == id), out var leaf))
         {
@@ -157,24 +172,37 @@ public sealed class GenericFileSystem<TData> : FileSystem<TData> where TData:cla
         protected override uint CollapsedFolderColor => ImGuiColors.DalamudViolet.ToUint();
         protected override uint ExpandedFolderColor => CollapsedFolderColor;
 
+        public event Action<Leaf, State, bool> OnAfterDrawLeafName;
+
         protected override void DrawLeafName(Leaf leaf, in State state, bool selected)
         {
             var flag = selected ? ImGuiTreeNodeFlags.Selected | LeafFlags : LeafFlags;
-            using var _ = ImRaii.TreeNode(leaf.Name + $"                                                       ", flag);
-        }
+            flag |= ImGuiTreeNodeFlags.SpanFullWidth;
+            using var _ = ImRaii.TreeNode(leaf.Name, flag);
+						OnAfterDrawLeafName?.Invoke(leaf, state, selected);
+				}
+
+        public delegate void OnBeforeCopyDelegate(TData original, ref TData copy);
+
+				public event OnBeforeCopyDelegate OnBeforeCopy;
 
         private void CopyToClipboardButton(Vector2 vector)
         {
             if (!ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Copy.ToIconString(), vector, "Copy to clipboard.", Selected == null, true)) return;
             if (this.Selected != null)
             {
-                var copy = this.Selected.JSONClone();
-                copy.GUID = Guid.Empty;
-                GenericHelpers.Copy(EzConfig.DefaultSerializationFactory.Serialize(copy, false));
+								var copy = this.Selected.JSONClone();
+								copy.GUID = Guid.Empty;
+                OnBeforeCopy?.Invoke(this.Selected, ref copy);
+								GenericHelpers.Copy(EzConfig.DefaultSerializationFactory.Serialize(copy, false));
             }
         }
 
-        private void ImportButton(Vector2 size)
+        public delegate void OnImportPopupOpenDelegate(string clipboardText, ref string newName);
+        public event OnImportPopupOpenDelegate OnImportPopupOpen;
+
+
+				private void ImportButton(Vector2 size)
         {
             if (!ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.FileImport.ToIconString(), size, "Try to import an item from your clipboard.", false,
                     true))
@@ -184,7 +212,9 @@ public sealed class GenericFileSystem<TData> : FileSystem<TData> where TData:cla
             {
                 CloneItem = null;
                 ClipboardText = GenericHelpers.Paste();
-                ImGui.OpenPopup("##NewItem");
+                OnImportPopupOpen?.Invoke(ClipboardText, ref NewName);
+
+								ImGui.OpenPopup("##NewItem");
             }
             catch
             {
@@ -215,10 +245,13 @@ public sealed class GenericFileSystem<TData> : FileSystem<TData> where TData:cla
             }
         }
 
+        public delegate void OnBeforeItemCreationDelegate(ref TData item);
+
+        public event OnBeforeItemCreationDelegate OnBeforeItemCreation = null;
+
         private void DrawNewItemPopup()
         {
-            if (!ImGuiUtil.OpenNameField("##NewItem", ref NewName))
-                return;
+            if (!OpenNameField("##NewItem", ref NewName)) return;
 
             if (NewName == "")
             {
@@ -233,7 +266,12 @@ public sealed class GenericFileSystem<TData> : FileSystem<TData> where TData:cla
                     var newItem = EzConfig.DefaultSerializationFactory.Deserialize<TData>(ClipboardText);
                     if (newItem != null)
                     {
-                        FS.Create(newItem, NewName, out _);
+                        OnBeforeItemCreation(ref newItem);
+                        if (newItem != null)
+                        {
+                            var success = FS.Create(newItem, NewName, out var error);
+                            if (!success) Notify.Error($"{error}");
+                        }
                     }
                     else
                     {
@@ -267,7 +305,30 @@ public sealed class GenericFileSystem<TData> : FileSystem<TData> where TData:cla
             NewName = string.Empty;
         }
 
-        protected override void DrawPopups()
+				private static bool OpenNameField(string popupName, ref string newName)
+				{
+						using var popup = ImRaii.Popup(popupName);
+						if (!popup)
+								return false;
+
+						if (ImGui.IsKeyPressed(ImGuiKey.Escape))
+								ImGui.CloseCurrentPopup();
+
+						ImGui.SetNextItemWidth(300 * ImGuiHelpers.GlobalScale);
+						if (ImGui.IsWindowAppearing())
+								ImGui.SetKeyboardFocusHere();
+						var enterPressed = ImGui.InputTextWithHint("##newName", "Enter New Name...", ref newName, 512, ImGuiInputTextFlags.EnterReturnsTrue);
+            ImGui.SameLine();
+            if (ImGui.Button("OK")) enterPressed = true;
+
+						if (!enterPressed)
+								return false;
+
+						ImGui.CloseCurrentPopup();
+						return true;
+				}
+
+				protected override void DrawPopups()
         {
             DrawNewItemPopup();
         }
