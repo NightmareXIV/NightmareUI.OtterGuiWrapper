@@ -17,7 +17,6 @@ using System.Collections.Generic;
 using ECommons;
 using ECommons.Logging;
 using System.Diagnostics.CodeAnalysis;
-using NightmareUI.OtterGuiWrapper.FileSystems;
 using System.Numerics;
 using Dalamud.Hooking;
 using FFXIVClientStructs.FFXIV.Client.UI;
@@ -27,8 +26,8 @@ using Dalamud.Interface.Utility;
 #pragma warning disable CS8618
 #pragma warning disable
 
-namespace NightmareUI.OtterGuiWrapper.FileSystems;
-public sealed class GenericFileSystem<TData> : FileSystem<TData> where TData:class, IFileSystemStorage, new()
+namespace NightmareUI.OtterGuiWrapper.FileSystems.Generic;
+public sealed class GenericFileSystem<TData> : FileSystem<TData> where TData : class, IFileSystemStorage, new()
 {
     string FilePath;
     public readonly FileSystemSelector Selector;
@@ -36,14 +35,14 @@ public sealed class GenericFileSystem<TData> : FileSystem<TData> where TData:cla
     public GenericFileSystem(ICollection<TData> dataStorage, string dataFilePrefix)
     {
         FilePath = Path.Combine(Svc.PluginInterface.ConfigDirectory.FullName, dataFilePrefix + "FileSystem.json");
-        this.DataStorage = dataStorage;
+        DataStorage = dataStorage;
         EzConfig.OnSave += Save;
         try
         {
             var info = new FileInfo(FilePath);
             if (info.Exists)
             {
-                this.Load(info, DataStorage, ConvertToIdentifier, ConvertToName);
+                Load(info, DataStorage, ConvertToIdentifier, ConvertToName);
             }
             Selector = new(this);
         }
@@ -60,7 +59,7 @@ public sealed class GenericFileSystem<TData> : FileSystem<TData> where TData:cla
             error = "This item already exists";
             return false;
         }
-        while(DataStorage.Any(x => x.GUID == newItem.GUID))
+        while (DataStorage.Any(x => x.GUID == newItem.GUID))
         {
             newItem.GUID = Guid.NewGuid();
         }
@@ -68,16 +67,16 @@ public sealed class GenericFileSystem<TData> : FileSystem<TData> where TData:cla
         {
             CreateLeaf(Root, newName, newItem);
         }
-        catch(Exception e)
+        catch (Exception e)
         {
             error = e.ToString();
             return false;
         }
-				DataStorage.Add(newItem);
-				newItem.SetCustomName(newName);
+        DataStorage.Add(newItem);
+        newItem.SetCustomName(newName);
         error = "";
         return true;
-		}
+    }
 
     public void DoDelete(TData item)
     {
@@ -85,30 +84,30 @@ public sealed class GenericFileSystem<TData> : FileSystem<TData> where TData:cla
         DataStorage.Remove(item);
         if (FindLeaf(item, out var leaf))
         {
-            this.Delete(leaf);
+            Delete(leaf);
         }
-        this.Save();
-		}
+        Save();
+    }
 
-		public bool FindLeaf(TData? item, [NotNullWhen(true)] out Leaf? leaf)
-		{
-				leaf = Root.GetAllDescendants(ISortMode<TData>.Lexicographical)
-						.OfType<Leaf>()
-						.FirstOrDefault(l => l.Value == item);
-				return leaf != null;
-		}
+    public bool FindLeaf(TData? item, [NotNullWhen(true)] out Leaf? leaf)
+    {
+        leaf = Root.GetAllDescendants(ISortMode<TData>.Lexicographical)
+                .OfType<Leaf>()
+                .FirstOrDefault(l => l.Value == item);
+        return leaf != null;
+    }
 
-		public IEnumerable<Folder> GetAllFolders()
-		{
-				return Root.GetAllDescendants(ISortMode<TData>.Lexicographical).OfType<Folder>();
-		}
+    public IEnumerable<Folder> GetAllFolders()
+    {
+        return Root.GetAllDescendants(ISortMode<TData>.Lexicographical).OfType<Folder>();
+    }
 
-		public IEnumerable<Leaf> GetAllLeaves()
-		{
-				return Root.GetAllDescendants(ISortMode<TData>.Lexicographical).OfType<Leaf>();
-		}
+    public IEnumerable<Leaf> GetAllLeaves()
+    {
+        return Root.GetAllDescendants(ISortMode<TData>.Lexicographical).OfType<Leaf>();
+    }
 
-		public bool TryGetPathByID(Guid id, [NotNullWhen(true)] out string? path)
+    public bool TryGetPathByID(Guid id, [NotNullWhen(true)] out string? path)
     {
         if (FindLeaf(DataStorage.FirstOrDefault(x => x.GUID == id), out var leaf))
         {
@@ -137,7 +136,7 @@ public sealed class GenericFileSystem<TData> : FileSystem<TData> where TData:cla
         {
             using var FileStream = new FileStream(FilePath, FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite);
             using var StreamWriter = new StreamWriter(FileStream);
-            this.SaveToFile(StreamWriter, SaveConverter, true);
+            SaveToFile(StreamWriter, SaveConverter, true);
         }
         catch (Exception ex)
         {
@@ -162,7 +161,7 @@ public sealed class GenericFileSystem<TData> : FileSystem<TData> where TData:cla
         GenericFileSystem<TData> FS;
         public FileSystemSelector(GenericFileSystem<TData> fs) : base(fs, Svc.KeyState, new(), (e) => e.Log())
         {
-            this.FS = fs;
+            FS = fs;
             AddButton(NewItemButton, 0);
             AddButton(ImportButton, 10);
             AddButton(CopyToClipboardButton, 20);
@@ -179,22 +178,22 @@ public sealed class GenericFileSystem<TData> : FileSystem<TData> where TData:cla
             var flag = selected ? ImGuiTreeNodeFlags.Selected | LeafFlags : LeafFlags;
             flag |= ImGuiTreeNodeFlags.SpanFullWidth;
             using var _ = ImRaii.TreeNode(leaf.Name, flag);
-						OnAfterDrawLeafName?.Invoke(leaf, state, selected);
-				}
+            OnAfterDrawLeafName?.Invoke(leaf, state, selected);
+        }
 
         public delegate void OnBeforeCopyDelegate(TData original, ref TData copy);
 
-				public event OnBeforeCopyDelegate OnBeforeCopy;
+        public event OnBeforeCopyDelegate OnBeforeCopy;
 
         private void CopyToClipboardButton(Vector2 vector)
         {
             if (!ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Copy.ToIconString(), vector, "Copy to clipboard.", Selected == null, true)) return;
-            if (this.Selected != null)
+            if (Selected != null)
             {
-								var copy = this.Selected.JSONClone();
-								copy.GUID = Guid.Empty;
-                OnBeforeCopy?.Invoke(this.Selected, ref copy);
-								GenericHelpers.Copy(EzConfig.DefaultSerializationFactory.Serialize(copy, false));
+                var copy = Selected.JSONClone();
+                copy.GUID = Guid.Empty;
+                OnBeforeCopy?.Invoke(Selected, ref copy);
+                GenericHelpers.Copy(EzConfig.DefaultSerializationFactory.Serialize(copy, false));
             }
         }
 
@@ -202,7 +201,7 @@ public sealed class GenericFileSystem<TData> : FileSystem<TData> where TData:cla
         public event OnImportPopupOpenDelegate OnImportPopupOpen;
 
 
-				private void ImportButton(Vector2 size)
+        private void ImportButton(Vector2 size)
         {
             if (!ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.FileImport.ToIconString(), size, "Try to import an item from your clipboard.", false,
                     true))
@@ -214,7 +213,7 @@ public sealed class GenericFileSystem<TData> : FileSystem<TData> where TData:cla
                 ClipboardText = GenericHelpers.Paste();
                 OnImportPopupOpen?.Invoke(ClipboardText, ref NewName);
 
-								ImGui.OpenPopup("##NewItem");
+                ImGui.OpenPopup("##NewItem");
             }
             catch
             {
@@ -228,7 +227,7 @@ public sealed class GenericFileSystem<TData> : FileSystem<TData> where TData:cla
             {
                 DeleteSelectionButton(vector, new DoubleModifier(ModifierHotkey.Control), "item", "items", FS.DoDelete);
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 e.Log();
             }
@@ -305,30 +304,30 @@ public sealed class GenericFileSystem<TData> : FileSystem<TData> where TData:cla
             NewName = string.Empty;
         }
 
-				private static bool OpenNameField(string popupName, ref string newName)
-				{
-						using var popup = ImRaii.Popup(popupName);
-						if (!popup)
-								return false;
+        private static bool OpenNameField(string popupName, ref string newName)
+        {
+            using var popup = ImRaii.Popup(popupName);
+            if (!popup)
+                return false;
 
-						if (ImGui.IsKeyPressed(ImGuiKey.Escape))
-								ImGui.CloseCurrentPopup();
+            if (ImGui.IsKeyPressed(ImGuiKey.Escape))
+                ImGui.CloseCurrentPopup();
 
-						ImGui.SetNextItemWidth(300 * ImGuiHelpers.GlobalScale);
-						if (ImGui.IsWindowAppearing())
-								ImGui.SetKeyboardFocusHere();
-						var enterPressed = ImGui.InputTextWithHint("##newName", "Enter New Name...", ref newName, 512, ImGuiInputTextFlags.EnterReturnsTrue);
+            ImGui.SetNextItemWidth(300 * ImGuiHelpers.GlobalScale);
+            if (ImGui.IsWindowAppearing())
+                ImGui.SetKeyboardFocusHere();
+            var enterPressed = ImGui.InputTextWithHint("##newName", "Enter New Name...", ref newName, 512, ImGuiInputTextFlags.EnterReturnsTrue);
             ImGui.SameLine();
             if (ImGui.Button("OK")) enterPressed = true;
 
-						if (!enterPressed)
-								return false;
+            if (!enterPressed)
+                return false;
 
-						ImGui.CloseCurrentPopup();
-						return true;
-				}
+            ImGui.CloseCurrentPopup();
+            return true;
+        }
 
-				protected override void DrawPopups()
+        protected override void DrawPopups()
         {
             DrawNewItemPopup();
         }
@@ -336,7 +335,7 @@ public sealed class GenericFileSystem<TData> : FileSystem<TData> where TData:cla
         public record struct State { }
         protected override bool ApplyFilters(IPath path)
         {
-            return FilterValue.Length > 0 && !path.FullName().Contains(this.FilterValue, StringComparison.OrdinalIgnoreCase);
+            return FilterValue.Length > 0 && !path.FullName().Contains(FilterValue, StringComparison.OrdinalIgnoreCase);
         }
 
     }

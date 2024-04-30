@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace NightmareUI.OtterGuiWrapper.FileSystems;
+namespace NightmareUI.OtterGuiWrapper.FileSystems.Generic;
 public interface IFileSystemStorage
 {
     public Guid GUID { get; set; }
