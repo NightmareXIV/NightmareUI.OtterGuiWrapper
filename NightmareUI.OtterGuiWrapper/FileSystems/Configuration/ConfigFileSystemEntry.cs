@@ -3,12 +3,15 @@ using System;
 using System.CodeDom;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace NightmareUI.OtterGuiWrapper.FileSystems.Configuration;
 public class ConfigFileSystemEntry
 {
+		public virtual Vector4? GetColor() => null;
+
 		public virtual string Path
 		{
 				get

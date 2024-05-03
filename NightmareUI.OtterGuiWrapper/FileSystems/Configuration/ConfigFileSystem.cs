@@ -13,6 +13,7 @@ using Dalamud.Logging;
 using System.Linq;
 using Newtonsoft.Json;
 using Lumina.Excel.GeneratedSheets;
+using System.Numerics;
 
 
 #pragma warning disable CS8618
@@ -54,7 +55,7 @@ public sealed class ConfigFileSystem<TData> : FileSystem<TData> where TData : Co
 								{
 										Selector.SelectByValue(DataStorage.First());
 								}
-								Selector.Selected.Draw();
+								Selector.Selected?.Draw();
 						}
 						catch (Exception e)
 						{
@@ -66,6 +67,7 @@ public sealed class ConfigFileSystem<TData> : FileSystem<TData> where TData : Co
 
 		public class FileSystemSelector : FileSystemSelector<TData, FileSystemSelector.State>
 		{
+				public string Filter => this.FilterValue;
 				public override ISortMode<TData> SortMode => ISortMode<TData>.InternalOrder;
 
 				ConfigFileSystem<TData> FS;
@@ -78,17 +80,25 @@ public sealed class ConfigFileSystem<TData> : FileSystem<TData> where TData : Co
 				protected override uint CollapsedFolderColor => ImGuiColors.DalamudViolet.ToUint();
 				protected override uint ExpandedFolderColor => CollapsedFolderColor;
 
+
 				protected override void DrawLeafName(Leaf leaf, in State state, bool selected)
 				{
 						var flag = selected ? ImGuiTreeNodeFlags.Selected | LeafFlags : LeafFlags;
 						flag |= ImGuiTreeNodeFlags.SpanFullWidth;
+						var col = leaf.Value.GetColor();
+						if (col != null) ImGui.PushStyleColor(ImGuiCol.Text, col.Value);
 						using var _ = ImRaii.TreeNode(leaf.Name, flag);
+						if (col != null) ImGui.PopStyleColor();
 				}
 
 				public record struct State { }
 				protected override bool ApplyFilters(IPath path)
 				{
-						return FilterValue.Length > 0 && !path.FullName().Contains(this.FilterValue, StringComparison.OrdinalIgnoreCase);
+						return false;
+				}
+				protected override bool ApplyFiltersAndState(IPath path, out ConfigFileSystem<TData>.FileSystemSelector.State state)
+				{
+						return false;
 				}
 		}
 }
