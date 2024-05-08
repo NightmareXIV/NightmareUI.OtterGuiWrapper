@@ -14,6 +14,15 @@ using System.Linq;
 using Newtonsoft.Json;
 using Lumina.Excel.GeneratedSheets;
 using System.Numerics;
+using Dalamud.Interface;
+using OtterGui;
+using System.Drawing;
+using ECommons.Reflection;
+using ECommons.ImGuiMethods;
+using System.Security.Policy;
+
+
+
 
 
 #pragma warning disable CS8618
@@ -22,26 +31,68 @@ using System.Numerics;
 namespace NightmareUI.OtterGuiWrapper.FileSystems.Configuration;
 public sealed class ConfigFileSystem<TData> : FileSystem<TData> where TData : ConfigFileSystemEntry, new()
 {
-		public readonly FileSystemSelector Selector;
+		public FileSystemSelector Selector { get; private set; }
 		public readonly ICollection<TData> DataStorage;
 		public ConfigFileSystem(ICollection<TData> dataStorage)
 		{
 				this.DataStorage = dataStorage;
 				try
 				{
-						var identifiers = new Dictionary<string, Dictionary<string, string>>()
-						{
-								["Data"] = DataStorage.ToDictionary(x => x.Path, x => x.Path)
-						};
-						PluginLog.Information($"{JsonConvert.SerializeObject(identifiers)}");
-						this.Load(JObject.Parse(JsonConvert.SerializeObject(identifiers)), DataStorage, (x) => x.Path, (x) => x.Path);
-						Selector = new(this);
+						Reload();
+						this.Changed += ConfigFileSystem_Changed;
 				}
 				catch (Exception e)
 				{
 						e.Log();
 				}
 		}
+
+		private void ConfigFileSystem_Changed(FileSystemChangeType type, IPath changedObject, IPath? previousParent, IPath? newParent)
+		{
+				if(type == FileSystemChangeType.ObjectMoved)
+				{
+						Reload();
+				}
+		}
+
+		private string SelectedPath;
+
+		public void Reload()
+		{
+				if(Selector != null)
+				{
+						SelectedPath = Selector.Selected?.Path;
+				}
+				var identifiers = new Dictionary<string, Dictionary<string, string>>()
+				{
+						["Data"] = DataStorage.ToDictionary(x => x.Path, x => x.Path)
+				};
+				PluginLog.Information($"{JsonConvert.SerializeObject(identifiers)}");
+				this.Load(JObject.Parse(JsonConvert.SerializeObject(identifiers)), DataStorage, (x) => x.Path, (x) => x.Path);
+				Selector = new(this);
+				if(SelectedPath != null)
+				{
+						var value = DataStorage.FirstOrDefault(x => x.Path == SelectedPath);
+						if (value != null) Selector.SelectByValue(value);
+				}
+		}
+
+
+
+		public Action<Vector2> DrawButton = (size) =>
+		{
+				var col = ImGuiEx.Vector4FromRGB(0x002766, 0.9f);
+				ImGui.PushStyleColor(ImGuiCol.Button, col);
+				ImGui.PushStyleColor(ImGuiCol.ButtonActive, col);
+				ImGui.PushStyleColor(ImGuiCol.ButtonHovered, col);
+				if (ImGui.Button("Support on Patreon", size))
+				{
+						GenericHelpers.ShellStart("https://www.patreon.com/NightmareXIV");
+				}
+				if (ImGui.IsItemHovered()) ImGui.SetMouseCursor(ImGuiMouseCursor.Hand);
+				//ImGuiEx.Tooltip($"Like the plugin? Consider supporting {DalamudReflector.GetPluginName()} by subscribing to Patreon and receive:\n- Exclusive content\n- Early access\n- Priority support\n...and much more!");
+				ImGui.PopStyleColor(3);
+		};
 
 		public void Draw(float width = 200f)
 		{
@@ -75,7 +126,15 @@ public sealed class ConfigFileSystem<TData> : FileSystem<TData> where TData : Co
 				{
 						this.FS = fs;
 						this.RemoveButton(FolderAddButton);
+						this.AddButton(DrawButtonInt, 1);
+						UnsubscribeRightClickFolder(ExpandAllDescendants);
+						UnsubscribeRightClickFolder(CollapseAllDescendants);
+						UnsubscribeRightClickFolder(DissolveFolder);
+						UnsubscribeRightClickFolder(RenameFolder);
+						UnsubscribeRightClickLeaf(RenameLeaf);
 				}
+
+				private void DrawButtonInt(Vector2 size) => FS.DrawButton(size);
 
 				protected override uint CollapsedFolderColor => ImGuiColors.DalamudViolet.ToUint();
 				protected override uint ExpandedFolderColor => CollapsedFolderColor;
