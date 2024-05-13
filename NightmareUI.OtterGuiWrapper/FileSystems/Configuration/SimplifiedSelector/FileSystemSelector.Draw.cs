@@ -129,6 +129,8 @@ public partial class FileSystemSelector<T, TStateStorage>
         drawList.AddLine(lineStart, AdjustedLineEnd(lineEnd), FolderLineColor, ImGuiHelpers.GlobalScale);
     }
 
+    private List<uint> OpenedFolders = [];
+
     // Draw a folder. Handles
     //     - drag'n drop
     //     - right-click context menus
@@ -138,8 +140,14 @@ public partial class FileSystemSelector<T, TStateStorage>
         var flags = ImGuiTreeNodeFlags.NoTreePushOnOpen | (FoldersDefaultOpen ? ImGuiTreeNodeFlags.DefaultOpen : ImGuiTreeNodeFlags.None);
         if (SelectedPaths.Contains(folder))
             flags |= ImGuiTreeNodeFlags.Selected;
+        flags |= ImGuiTreeNodeFlags.SpanFullWidth;
         var       expandedState = GetPathState(folder);
         using var color         = ImRaii.PushColor(ImGuiCol.Text, expandedState ? ExpandedFolderColor : CollapsedFolderColor);
+        if (!OpenedFolders.Contains(folder.Identifier))
+        {
+            OpenedFolders.Add(folder.Identifier);
+            ImGui.SetNextItemOpen(true);
+				}
         var       recurse       = ImGui.TreeNodeEx((IntPtr)folder.Identifier, flags, folder.Name.Replace("%", "%%"));
 
         if (expandedState != recurse)

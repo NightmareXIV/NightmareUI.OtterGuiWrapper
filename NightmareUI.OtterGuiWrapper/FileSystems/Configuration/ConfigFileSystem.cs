@@ -63,7 +63,7 @@ public sealed class ConfigFileSystem<TData> : FileSystem<TData> where TData : Co
 						try
 						{
 								if (x.Path.IsNullOrEmpty()) PluginLog.Error($"Item {x.GetType().FullName} has it's path null or empty");
-								PluginLog.Information($"Item {x.GetType().FullName} pat {x.Path}");
+								PluginLog.Verbose($"Item {x.GetType().FullName} pat {x.Path}");
 						}
 						catch(Exception e)
 						{
@@ -89,7 +89,7 @@ public sealed class ConfigFileSystem<TData> : FileSystem<TData> where TData : Co
 								var splitPath = x.Path.SplitDirectories();
 								for (int i = 0; i < splitPath.Length; i++)
 								{
-										var newWidth = ImGui.CalcTextSize(splitPath[i]).X + (i + 1) * 25f;
+										var newWidth = ImGui.CalcTextSize(splitPath[i]).X + (i + 1) * 25f + ImGui.GetStyle().ScrollbarSize;
 										if (newWidth > width.Value) width = newWidth;
 								}
 						}
@@ -125,6 +125,7 @@ public sealed class ConfigFileSystem<TData> : FileSystem<TData> where TData : Co
 						this.FS = fs;
 				}
 
+				protected override bool FoldersDefaultOpen => true;
 				protected override uint CollapsedFolderColor => ImGuiColors.DalamudViolet.ToUint();
 				protected override uint ExpandedFolderColor => CollapsedFolderColor;
 
