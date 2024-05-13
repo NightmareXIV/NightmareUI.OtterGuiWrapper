@@ -12,6 +12,7 @@ using Newtonsoft.Json;
 using System.Numerics;
 using ECommons.ImGuiMethods;
 using ECommons.Logging;
+using NightmareUI.PrimaryUI;
 
 #pragma warning disable CS8618
 #pragma warning disable
@@ -104,7 +105,20 @@ public sealed class ConfigFileSystem<TData> : FileSystem<TData> where TData : Co
 								{
 										Selector.SelectByValue(DataStorage.First());
 								}
-								Selector.Selected?.Draw();
+								if(Selector.Selected != null)
+								{
+										if (Selector.Selected.NoFrame || Selector.Selected.Builder != null)
+										{
+												Selector.Selected.Draw();
+										}
+										else
+										{
+												new NuiBuilder()
+														.Section(Selector.Selected.Path.SplitDirectories().Join(" - "))
+														.Widget(Selector.Selected.Draw)
+														.Draw();
+										}
+								} 
 						}
 						catch (Exception e)
 						{

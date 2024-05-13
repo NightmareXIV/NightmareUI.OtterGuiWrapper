@@ -47,6 +47,8 @@ public class ConfigFileSystemEntry
 				}
 		}
 
+		public virtual bool NoFrame { get; set; } = false;
+
 		public virtual void Draw()
 		{
 				if(Builder != null)

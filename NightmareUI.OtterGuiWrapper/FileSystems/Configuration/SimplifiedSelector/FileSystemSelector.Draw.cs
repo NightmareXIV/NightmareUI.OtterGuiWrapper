@@ -175,11 +175,13 @@ public partial class FileSystemSelector<T, TStateStorage>
         return rect;
     }
 
+    public bool DrawFilter = true;
+
     // Draw the whole list.
     private bool DrawList(float width)
     {
         // Filter row is outside the child for scrolling.
-        DrawFilterRow(width);
+        if(DrawFilter) DrawFilterRow(width);
 
         using var style = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, Vector2.Zero);
         using var _     = ImRaii.Child(Label, new Vector2(width, 0), true);
