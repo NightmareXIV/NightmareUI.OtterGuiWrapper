@@ -28,7 +28,7 @@ public class ConfigFileSystemEntry
 				return true;
 		}
 
-		public Vector4? GetColor()
+		public virtual Vector4? GetColor()
 		{
 				if (Filter().IsNullOrEmpty() == false)
 				{
