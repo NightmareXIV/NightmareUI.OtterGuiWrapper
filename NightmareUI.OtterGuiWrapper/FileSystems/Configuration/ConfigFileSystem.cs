@@ -23,9 +23,12 @@ public sealed class ConfigFileSystem<TData> : FileSystem<TData> where TData : Co
 		public FileSystemSelector Selector { get; private set; }
 		public ICollection<TData> DataStorage { get; private set; }
 		private Func<ICollection<TData>> GetDataAction;
-		public ConfigFileSystem(Func<ICollection<TData>> getDataAction)
+		public Func<TData> DefaultValueSelector;
+
+    public ConfigFileSystem(Func<ICollection<TData>> getDataAction)
 		{
-				this.GetDataAction = getDataAction;
+				this.DefaultValueSelector = () => DataStorage.First();
+        this.GetDataAction = getDataAction;
 				try
 				{
 						Reload();
@@ -101,9 +104,9 @@ public sealed class ConfigFileSystem<TData> : FileSystem<TData> where TData : Co
 				{
 						try
 						{
-								if (Selector.Selected == null)
+								if (Selector.Selected == null && DefaultValueSelector != null)
 								{
-										Selector.SelectByValue(DataStorage.First());
+										Selector.SelectByValue(DefaultValueSelector());
 								}
 								if(Selector.Selected != null)
 								{
