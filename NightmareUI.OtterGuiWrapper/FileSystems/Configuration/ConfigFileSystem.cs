@@ -18,14 +18,14 @@ using NightmareUI.PrimaryUI;
 #pragma warning disable
 
 namespace NightmareUI.OtterGuiWrapper.FileSystems.Configuration;
-public sealed class ConfigFileSystem<TData> : FileSystem<TData> where TData : ConfigFileSystemEntry, new()
+public sealed class ConfigFileSystem: FileSystem<ConfigFileSystemEntry>
 {
 		public FileSystemSelector Selector { get; private set; }
-		public ICollection<TData> DataStorage { get; private set; }
-		private Func<ICollection<TData>> GetDataAction;
-		public Func<TData> DefaultValueSelector;
+		public ICollection<ConfigFileSystemEntry> DataStorage { get; private set; }
+		private Func<ICollection<ConfigFileSystemEntry>> GetDataAction;
+		public Func<ConfigFileSystemEntry> DefaultValueSelector;
 
-    public ConfigFileSystem(Func<ICollection<TData>> getDataAction)
+    public ConfigFileSystem(Func<ICollection<ConfigFileSystemEntry>> getDataAction)
 		{
 				this.DefaultValueSelector = () => DataStorage.First();
         this.GetDataAction = getDataAction;
@@ -140,14 +140,14 @@ public sealed class ConfigFileSystem<TData> : FileSystem<TData> where TData : Co
 				ImGui.EndChild();
 		}
 
-		public class FileSystemSelector : NightmareUI.OtterGuiWrapper.FileSystems.Configuration.SimplifiedSelector.FileSystemSelector<TData, FileSystemSelector.State>
+		public class FileSystemSelector : NightmareUI.OtterGuiWrapper.FileSystems.Configuration.SimplifiedSelector.FileSystemSelector<ConfigFileSystemEntry, FileSystemSelector.State>
 		{
 				public string Filter => this.FilterValue;
 				public bool Sorted = false;
-				public override ISortMode<TData> SortMode => Sorted?ISortMode<TData>.Lexicographical:ISortMode<TData>.InternalOrder;
+				public override ISortMode<ConfigFileSystemEntry> SortMode => Sorted?ISortMode<ConfigFileSystemEntry>.Lexicographical:ISortMode<ConfigFileSystemEntry>.InternalOrder;
 
-				ConfigFileSystem<TData> FS;
-				public FileSystemSelector(ConfigFileSystem<TData> fs) : base(fs, Svc.KeyState, new(), (e) => e.Log())
+				ConfigFileSystem FS;
+				public FileSystemSelector(ConfigFileSystem fs) : base(fs, Svc.KeyState, new(), (e) => e.Log())
 				{
 						this.FS = fs;
 				}
@@ -171,7 +171,7 @@ public sealed class ConfigFileSystem<TData> : FileSystem<TData> where TData : Co
 				{
 						return false;
 				}
-				protected override bool ApplyFiltersAndState(IPath path, out ConfigFileSystem<TData>.FileSystemSelector.State state)
+				protected override bool ApplyFiltersAndState(IPath path, out ConfigFileSystem.FileSystemSelector.State state)
 				{
 						return false;
 				}
