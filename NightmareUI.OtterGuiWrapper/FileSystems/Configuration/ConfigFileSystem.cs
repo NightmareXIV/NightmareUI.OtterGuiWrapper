@@ -37,6 +37,15 @@ public sealed class ConfigFileSystem<TData> : FileSystem<TData> where TData : Co
 				{
 						e.Log();
 				}
+				var types = ECommonsMain.Instance.GetType().Assembly.GetTypes().Where(x => !x.IsInterface && !x.IsAbstract && x.IsAssignableTo(typeof(ConfigFileSystemEntry)));
+				var dataTypes = DataStorage.Select(x => x.GetType());
+				foreach(var type in types)
+				{
+						if(!dataTypes.Contains(type))
+						{
+								PluginLog.Warning($"{type} was not found in ConfigFileSystem's Data, did you forgot to create an instance of it?");
+						}
+				}
 		}
 
 		private string SelectedPath;
