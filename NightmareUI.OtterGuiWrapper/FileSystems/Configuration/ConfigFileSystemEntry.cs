@@ -16,6 +16,7 @@ public class ConfigFileSystemEntry
 {
 		internal Func<string> Filter = null!;
 		public virtual NuiBuilder? Builder { get; init; }
+		public virtual int DisplayPriority { get; init; } = 0;
 
 		public virtual bool ShouldHighlight()
 		{
