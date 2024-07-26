@@ -135,7 +135,7 @@ public sealed class ConfigFileSystem<TData> : FileSystem<TData> where TData : Co
 		{
 				public string Filter => this.FilterValue;
 				public bool Sorted = false;
-				public override ISortMode<TData> SortMode => Sorted?ISortMode<TData>.Lexicographical:ISortMode<TData>.InternalOrder;
+				public override ISortMode<TData> SortMode => Sorted?ISortMode<TData>.FoldersFirst:ISortMode<TData>.InternalOrder;
 
 				ConfigFileSystem<TData> FS;
 				public FileSystemSelector(ConfigFileSystem<TData> fs) : base(fs, Svc.KeyState, new(), (e) => e.Log())
