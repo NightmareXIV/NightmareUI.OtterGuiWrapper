@@ -13,7 +13,7 @@ public static class ConfigFileSystemHelpers
 		{
 				var instances = typeof(T).Assembly.GetTypes().Where(x => !x.IsAbstract && typeof(T).IsAssignableFrom(x)).Select(x => (T?)Activator.CreateInstance(x, true));
 				var priorities = instances.Select(x => x.DisplayPriority).Distinct();
-				foreach(var x in priorities.Reverse())
+				foreach(var x in priorities.OrderDescending())
 				{
 						foreach(var i in instances)
 						{
