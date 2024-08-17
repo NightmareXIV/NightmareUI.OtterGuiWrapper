@@ -43,7 +43,7 @@ public sealed class ConfigFileSystem: FileSystem<ConfigFileSystemEntry>
 				{
 						if(!dataTypes.Contains(type))
 						{
-								PluginLog.Warning($"{type} was not found in ConfigFileSystem's Data, did you forgot to create an instance of it?");
+								//PluginLog.Warning($"{type} was not found in ConfigFileSystem's Data, did you forgot to create an instance of it?");
 						}
 				}
 		}
