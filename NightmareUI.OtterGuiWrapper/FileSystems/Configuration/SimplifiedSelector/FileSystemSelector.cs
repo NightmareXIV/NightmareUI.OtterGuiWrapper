@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using OtterGui;
+using ECommons;
 
 namespace NightmareUI.OtterGuiWrapper.FileSystems.Configuration.SimplifiedSelector;
 
@@ -49,11 +50,11 @@ public partial class FileSystemSelector<T, TStateStorage> where T : class where 
         }
         else if (all && AllowMultipleSelection && SelectedLeaf != path)
         {
-            var idxTo = OtterGui.ArrayExtensions.IndexOf(_state, s => s.Path == path);
+            var idxTo = GenericHelpers.IndexOf(_state, s => s.Path == path);
             var depth = _state[idxTo].Depth;
             if (SelectedLeaf != null && _selectedPaths.Count == 0)
             {
-                var idxFrom = OtterGui.ArrayExtensions.IndexOf(_state, s => s.Path == SelectedLeaf);
+                var idxFrom = GenericHelpers.IndexOf(_state, s => s.Path == SelectedLeaf);
                 (idxFrom, idxTo) = idxFrom > idxTo ? (idxTo, idxFrom) : (idxFrom, idxTo);
                 if (_state.Skip(idxFrom).Take(idxTo - idxFrom + 1).All(s => s.Depth == depth))
                 {
