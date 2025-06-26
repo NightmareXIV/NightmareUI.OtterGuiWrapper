@@ -120,13 +120,13 @@ public sealed class GenericFileSystem<TData> : FileSystem<TData> where TData : c
 
     private string ConvertToName(TData item)
     {
-        PluginLog.Debug($"Request conversion of {item.GetCustomName()} {item.GUID} to name");
+        PluginLog.Verbose($"Request conversion of {item.GetCustomName()} {item.GUID} to name");
         return $"Unnamed " + item.GUID;
     }
 
     private string ConvertToIdentifier(TData item)
     {
-        PluginLog.Debug($"Request conversion of {item.GetCustomName()} {item.GUID} to identifier");
+        PluginLog.Verbose($"Request conversion of {item.GetCustomName()} {item.GUID} to identifier");
         return item.GUID.ToString();
     }
 
