@@ -1,10 +1,11 @@
+using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Keys;
 using Dalamud.Interface.Utility;
-using Dalamud.Bindings.ImGui;
 using OtterGui;
 using OtterGui.Classes;
 using OtterGui.Filesystem;
 using OtterGui.Raii;
+using OtterGui.Text;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -148,7 +149,7 @@ public partial class FileSystemSelector<T, TStateStorage>
             OpenedFolders.Add(folder.Identifier);
             ImGui.SetNextItemOpen(true);
 				}
-        var       recurse       = ImGui.TreeNodeEx((IntPtr)folder.Identifier, flags, folder.Name.Replace("%", "%%"));
+        var recurse = ImUtf8.TreeNode((nint)folder.Identifier, folder.Name.Replace("%", "%%"), flags);
 
         if (expandedState != recurse)
             AddOrRemoveDescendants(folder, recurse);
@@ -208,7 +209,7 @@ public partial class FileSystemSelector<T, TStateStorage>
         ImGuiListClipperPtr clipper;
         unsafe
         {
-            clipper = new ImGuiListClipperPtr(ImGuiNative.ImGuiListClipper_ImGuiListClipper());
+            clipper = new ImGuiListClipperPtr(ImGuiNative.ImGuiListClipper());
         }
 
         // TODO: do this right.
