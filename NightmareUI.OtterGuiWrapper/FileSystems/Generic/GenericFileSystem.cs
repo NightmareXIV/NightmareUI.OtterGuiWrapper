@@ -168,6 +168,15 @@ public sealed class GenericFileSystem<TData> : FileSystem<TData> where TData : c
             AddButton(DeleteButton, 1000);
         }
 
+        public float Width = 0f;
+        protected override float CurrentWidth => Width;
+
+        public void Draw(float width)
+        {
+            this.Width = width;
+            this.Draw();
+        }
+
         protected override uint CollapsedFolderColor => ImGuiColors.DalamudViolet.ToUint();
         protected override uint ExpandedFolderColor => CollapsedFolderColor;
 
