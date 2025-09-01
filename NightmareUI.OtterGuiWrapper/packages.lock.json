@@ -26,7 +26,7 @@
       "nightmareui": {
         "type": "Project",
         "dependencies": {
-          "ECommons": "[3.0.1.10, )"
+          "ECommons": "[3.0.1.8, )"
         }
       },
       "ottergui": {
