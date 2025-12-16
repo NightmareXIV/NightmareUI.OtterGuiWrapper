@@ -24,6 +24,7 @@ public sealed class ConfigFileSystem: FileSystem<ConfigFileSystemEntry>
 		public ICollection<ConfigFileSystemEntry> DataStorage { get; private set; }
 		private Func<ICollection<ConfigFileSystemEntry>> GetDataAction;
 		public Func<ConfigFileSystemEntry> DefaultValueSelector;
+		public Action DrawWhenNoSelection { get; set; } = null;
 
     public ConfigFileSystem(Func<ICollection<ConfigFileSystemEntry>> getDataAction)
 		{
@@ -130,7 +131,18 @@ public sealed class ConfigFileSystem: FileSystem<ConfigFileSystemEntry>
 														.Widget(Selector.Selected.Draw)
 														.Draw();
 										}
-								} 
+								}
+								else
+								{
+										try
+										{
+												DrawWhenNoSelection?.Invoke();
+										}
+										catch(Exception e)
+										{
+												e.Log();
+										}
+								}
 						}
 						catch (Exception e)
 						{
