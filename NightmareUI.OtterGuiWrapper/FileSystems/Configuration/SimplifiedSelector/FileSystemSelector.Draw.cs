@@ -238,6 +238,7 @@ public partial class FileSystemSelector<T, TStateStorage>
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, Vector2.Zero);
         HandleActions();
         style.Push(ImGuiStyleVar.WindowPadding, Vector2.Zero);
+        style.Dispose();
         return true;
     }
 }
